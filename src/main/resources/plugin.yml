@@ -1,0 +1,20 @@
+name: EssenceMod
+version: 1.0
+main: com.ibrahim.essencemod.EssenceMod
+api-version: 1.21
+author: Ibrahim
+depend: [Vault]
+commands:
+  essence:
+    description: Change your essence, manage cooldown, or set player essence (admin)
+    usage: /essence [setcooldown <seconds>|set <player> <essence>]
+permissions:
+  essencemod.use:
+    description: Allows players to use the /essence command to open the essence menu
+    default: true
+  essencemod.setcooldown:
+    description: Allows players to set the essence command cooldown
+    default: op
+  essencemod.admin:
+    description: Allows players to set other players' essences
+    default: op

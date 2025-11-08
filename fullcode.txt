@@ -1,0 +1,404 @@
+pom.xml:
+<code>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.ibrahim</groupId>
+    <artifactId>essencemod</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>papermc</id>
+            <url>https://repo.papermc.io/repository/maven-public/</url>
+        </repository>
+        <repository>
+            <id>jitpack</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.papermc.paper</groupId>
+            <artifactId>paper-api</artifactId>
+            <version>1.21.1-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.MilkBowl</groupId>
+            <artifactId>Vault</artifactId>
+            <version>1.7.3</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.ibrahim.essencemod.EssenceMod</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>plugin.yml</include>
+                </includes>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+    </build>
+</project>
+</code>
+
+src\main\java\com\ibrahim\Main.java:
+<code>
+package com.ibrahim;
+
+public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+}
+</code>
+
+src\main\java\com\ibrahim\essencemod\EssenceMod.java:
+<code>
+package com.ibrahim.essencemod;
+
+import net.milkbowl.vault.economy.Economy;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.RegisteredServiceProvider;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+
+import java.util.*;
+
+public class EssenceMod extends JavaPlugin implements Listener {
+
+    private Economy economy;
+    private Map<UUID, String> playerEssences = new HashMap<>();
+    private Map<UUID, Long> cooldowns = new HashMap<>();
+    private long COOLDOWN_TIME = 86400000; // 24 hours in ms, modifiable
+
+    @Override
+    public void onEnable() {
+        if (!setupEconomy()) {
+            getLogger().severe("Vault not found! Disabling plugin.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        getServer().getPluginManager().registerEvents(this, this);
+        // Load data if needed (for persistence, add config saving later)
+    }
+
+    private boolean setupEconomy() {
+        RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
+        if (rsp == null) return false;
+        economy = rsp.getProvider();
+        return true;
+    }
+
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+
+        // Give starting balance if new
+        if (!player.hasPlayedBefore()) {
+            economy.depositPlayer(player, 500);
+        }
+
+        // Show menu if player has permission
+        if (player.hasPermission("essencemod.use")) {
+            showEssenceMenu(player);
+        }
+
+        // Apply essence if already chosen
+        applyEssence(player);
+    }
+
+    private void showEssenceMenu(Player player) {
+        Inventory menu = Bukkit.createInventory(null, 27, ChatColor.GOLD + "Essence Menu");
+
+        // Zombie item
+        ItemStack zombie = new ItemStack(org.bukkit.Material.ZOMBIE_HEAD);
+        ItemMeta zombieMeta = zombie.getItemMeta();
+        zombieMeta.setDisplayName(ChatColor.GREEN + "Zombie - 500$");
+        zombieMeta.setLore(Arrays.asList("x1.0 Scale", "Infinite Hunger"));
+        zombie.setItemMeta(zombieMeta);
+        menu.setItem(10, zombie);
+
+        // Chicken item
+        ItemStack chicken = new ItemStack(org.bukkit.Material.CHICKEN);
+        ItemMeta chickenMeta = chicken.getItemMeta();
+        chickenMeta.setDisplayName(ChatColor.GREEN + "Chicken - 500$");
+        chickenMeta.setLore(Arrays.asList("x0.9 Scale", "No Fall Damage"));
+        chicken.setItemMeta(chickenMeta);
+        menu.setItem(12, chicken);
+
+        // Iron Golem item
+        ItemStack golem = new ItemStack(org.bukkit.Material.IRON_BLOCK);
+        ItemMeta golemMeta = golem.getItemMeta();
+        golemMeta.setDisplayName(ChatColor.RED + "Iron Golem - 10,000$");
+        golemMeta.setLore(Arrays.asList("x1.2 Scale", "x1.5 Damage", "15 Hearts"));
+        golem.setItemMeta(golemMeta);
+        menu.setItem(14, golem);
+
+        // Blaze item
+        ItemStack blaze = new ItemStack(org.bukkit.Material.BLAZE_ROD);
+        ItemMeta blazeMeta = blaze.getItemMeta();
+        blazeMeta.setDisplayName(ChatColor.RED + "Blaze - 10,000$");
+        blazeMeta.setLore(Arrays.asList("x1.0 Scale", "Fire Resistance", "Auto Smelt & Cook"));
+        blaze.setItemMeta(blazeMeta);
+        menu.setItem(16, blaze);
+
+        player.openInventory(menu);
+    }
+
+    @EventHandler
+    public void onInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!event.getView().getTitle().equals(ChatColor.GOLD + "Essence Menu")) return;
+        event.setCancelled(true);
+        Player player = (Player) event.getWhoClicked();
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null) return;
+
+        String essence = null;
+        double cost = 0;
+        if (clicked.getType() == org.bukkit.Material.ZOMBIE_HEAD) {
+            essence = "zombie";
+            cost = 500;
+        } else if (clicked.getType() == org.bukkit.Material.CHICKEN) {
+            essence = "chicken";
+            cost = 500;
+        } else if (clicked.getType() == org.bukkit.Material.IRON_BLOCK) {
+            essence = "golem";
+            cost = 10000;
+        } else if (clicked.getType() == org.bukkit.Material.BLAZE_ROD) {
+            essence = "blaze";
+            cost = 10000;
+        }
+
+        if (essence != null) {
+            if (economy.getBalance(player) < cost) {
+                player.sendMessage(ChatColor.RED + "Not enough money!");
+                return;
+            }
+            economy.withdrawPlayer(player, cost);
+            playerEssences.put(player.getUniqueId(), essence);
+            applyEssence(player);
+            player.sendMessage(ChatColor.GREEN + "Purchased " + essence + " essence!");
+            player.closeInventory();
+        }
+    }
+
+    private void applyEssence(Player player) {
+        String essence = playerEssences.getOrDefault(player.getUniqueId(), null);
+        if (essence == null) return;
+
+        // Reset attributes/effects first
+        player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(1.0);
+        player.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE).setBaseValue(1.0);
+        player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(20.0);
+        player.setHealth(20.0);
+        player.removePotionEffect(PotionEffectType.FIRE_RESISTANCE);
+        player.removePotionEffect(PotionEffectType.SATURATION);
+
+        switch (essence) {
+            case "zombie":
+                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(1.0);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, PotionEffect.INFINITE_DURATION, 255, false, false));
+                break;
+            case "chicken":
+                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(0.9);
+                // No fall damage handled in event
+                break;
+            case "golem":
+                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(1.2);
+                player.getAttribute(Attribute.GENERIC_ATTACK_DAMAGE).setBaseValue(1.5);
+                player.getAttribute(Attribute.GENERIC_MAX_HEALTH).setBaseValue(30.0);
+                player.setHealth(30.0);
+                break;
+            case "blaze":
+                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(1.0);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, PotionEffect.INFINITE_DURATION, 1, false, false));
+                // Auto smelt handled in events
+                break;
+        }
+    }
+
+    @EventHandler
+    public void onFallDamage(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
+        if (!(event.getEntity() instanceof Player player)) return;
+        if ("chicken".equals(playerEssences.get(player.getUniqueId()))) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent event) {
+        Player player = event.getPlayer();
+        if (!"blaze".equals(playerEssences.get(player.getUniqueId()))) return;
+
+        // Auto-smelt ores
+        Collection<ItemStack> drops = event.getBlock().getDrops(player.getInventory().getItemInMainHand());
+        for (ItemStack drop : drops) {
+            ItemStack smelted = getSmelted(drop);
+            if (smelted != null) {
+                event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation(), smelted);
+                event.setDropItems(false);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (!(event.getEntity().getKiller() instanceof Player player)) return;
+        if (!"blaze".equals(playerEssences.get(player.getUniqueId()))) return;
+
+        // Auto-cook food drops
+        List<ItemStack> drops = event.getDrops();
+        for (int i = 0; i < drops.size(); i++) {
+            ItemStack cooked = getCooked(drops.get(i));
+            if (cooked != null) {
+                drops.set(i, cooked);
+            }
+        }
+    }
+
+    private ItemStack getSmelted(ItemStack item) {
+        return switch (item.getType()) {
+            case org.bukkit.Material.RAW_IRON -> new ItemStack(org.bukkit.Material.IRON_INGOT, item.getAmount());
+            case org.bukkit.Material.RAW_GOLD -> new ItemStack(org.bukkit.Material.GOLD_INGOT, item.getAmount());
+            case org.bukkit.Material.RAW_COPPER -> new ItemStack(org.bukkit.Material.COPPER_INGOT, item.getAmount());
+            default -> null;
+        };
+    }
+
+    private ItemStack getCooked(ItemStack item) {
+        return switch (item.getType()) {
+            case org.bukkit.Material.BEEF -> new ItemStack(org.bukkit.Material.COOKED_BEEF, item.getAmount());
+            case org.bukkit.Material.CHICKEN -> new ItemStack(org.bukkit.Material.COOKED_CHICKEN, item.getAmount());
+            case org.bukkit.Material.PORKCHOP -> new ItemStack(org.bukkit.Material.COOKED_PORKCHOP, item.getAmount());
+            default -> null;
+        };
+    }
+
+    @Override
+    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("essence")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(ChatColor.RED + "This command is for players only!");
+                return true;
+            }
+
+            // Handle /essence setcooldown <seconds>
+            if (args.length == 2 && args[0].equalsIgnoreCase("setcooldown")) {
+                if (!player.hasPermission("essencemod.setcooldown")) {
+                    player.sendMessage(ChatColor.RED + "You don't have permission to use this command!");
+                    return true;
+                }
+                try {
+                    long newCooldown = Long.parseLong(args[1]) * 1000; // Convert seconds to milliseconds
+                    if (newCooldown < 0) {
+                        player.sendMessage(ChatColor.RED + "Cooldown must be non-negative!");
+                        return true;
+                    }
+                    COOLDOWN_TIME = newCooldown;
+                    player.sendMessage(ChatColor.GREEN + "Essence cooldown set to " + args[1] + " seconds!");
+                    return true;
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ChatColor.RED + "Please enter a valid number of seconds!");
+                    return true;
+                }
+            }
+
+            // Handle /essence (open menu with cooldown check)
+            if (!player.hasPermission("essencemod.use")) {
+                player.sendMessage(ChatColor.RED + "You don't have permission to use this command!");
+                return true;
+            }
+            long now = System.currentTimeMillis();
+            long last = cooldowns.getOrDefault(player.getUniqueId(), 0L);
+            if (now - last < COOLDOWN_TIME) {
+                long secondsLeft = (COOLDOWN_TIME - (now - last)) / 1000;
+                player.sendMessage(ChatColor.RED + "You can only change essence once every " +
+                        (COOLDOWN_TIME / 1000) + " seconds! Wait " + secondsLeft + " more seconds.");
+                return true;
+            }
+            cooldowns.put(player.getUniqueId(), now);
+            showEssenceMenu(player);
+            return true;
+        }
+        return false;
+    }
+}
+</code>
+
+src\main\resources\plugin.yml:
+<code>
+name: EssenceMod
+version: 1.0
+main: com.ibrahim.essencemod.EssenceMod
+api-version: 1.21
+author: Ibrahim
+depend: [Vault]
+commands:
+  essence:
+    description: Change your essence or manage cooldown (OP-only for cooldown)
+    usage: /essence [setcooldown <seconds>]
+permissions:
+  essencemod.use:
+    description: Allows players to use the /essence command to open the essence menu
+    default: true
+  essencemod.setcooldown:
+    description: Allows players to set the essence command cooldown
+    default: op
+</code>
+
