@@ -177,7 +177,7 @@ public class EssenceMod extends JavaPlugin implements Listener {
         ItemStack chicken = new ItemStack(org.bukkit.Material.CHICKEN);
         ItemMeta chickenMeta = chicken.getItemMeta();
         chickenMeta.setDisplayName(ChatColor.GREEN + "Chicken - 500$");
-        chickenMeta.setLore(Arrays.asList("x0.9 Scale", "No Fall Damage"));
+        chickenMeta.setLore(Arrays.asList("x0.5 Scale", "No Fall Damage"));
         chicken.setItemMeta(chickenMeta);
         menu.setItem(12, chicken);
 
@@ -255,7 +255,7 @@ public class EssenceMod extends JavaPlugin implements Listener {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SATURATION, PotionEffect.INFINITE_DURATION, 255, false, false));
                 break;
             case "chicken":
-                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(0.9);
+                player.getAttribute(Attribute.GENERIC_SCALE).setBaseValue(0.5);
                 // No fall damage handled in event
                 break;
             case "golem":
